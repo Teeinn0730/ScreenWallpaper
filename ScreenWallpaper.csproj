@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Windows SDK projection for Media Foundation playback (Windows.Media.Playback) and composition -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>ScreenWallpaper</AssemblyName>
+    <RootNamespace>ScreenWallpaper</RootNamespace>
+    <Product>ScreenWallpaper</Product>
+    <Version>1.0.0</Version>
+    <!-- DPI awareness lives in app.manifest on purpose: this is a WPF app hosting WinForms. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The VBS launcher runs "dotnet ScreenWallpaper.dll", which a self-contained build doesn't have. -->
+    <None Update="ScreenWallpaper.vbs" CopyToOutputDirectory="PreserveNewest" Condition="'$(SelfContained)' != 'true'" />
+  </ItemGroup>
+
+</Project>

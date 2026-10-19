@@ -1,0 +1,14 @@
+# Build output
+bin/
+obj/
+publish/
+publish-standalone/
+*.zip
+
+# IDE
+.vs/
+.vscode/
+*.user
+
+# Personal wallpaper files (may be copyrighted; not part of the tool)
+wallpapers/
