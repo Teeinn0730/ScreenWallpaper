@@ -43,8 +43,8 @@ internal sealed class WallpaperSurface : IDisposable
             if (video is not null) CreateVideo(bounds, video, settings.Mode);
             else CreateImage(file, settings);
 
-            if (target.InsertAfter != IntPtr.Zero)
-                SetWindowPos(Handle, target.InsertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            _insertAfter = target.InsertAfter;
+            RestoreZOrder();
         }
         catch
         {
@@ -54,6 +54,15 @@ internal sealed class WallpaperSurface : IDisposable
     }
 
     public IntPtr Handle => _host?.Handle ?? IntPtr.Zero;
+
+    private IntPtr _insertAfter;
+
+    /// <summary>Puts this window directly below the desktop icons (Windows 11 24H2+ layout only).</summary>
+    public void RestoreZOrder()
+    {
+        if (_insertAfter != IntPtr.Zero)
+            SetWindowPos(Handle, _insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
 
     private void CreateVideo(RECT bounds, VideoPlayer video, FitMode mode)
     {

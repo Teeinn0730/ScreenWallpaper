@@ -249,12 +249,33 @@ internal sealed class WallpaperController : IDisposable
             return;
         }
 
+        // Explorer recreates its static wallpaper window (e.g. after sleep or a wallpaper change)
+        // right below the icons, covering ours. Put our windows back on top of it.
+        if (!SurfacesDirectlyBelowIcons())
+        {
+            Log.Write("Desktop wallpaper layer moved above ours (after sleep or wallpaper change?), restoring order");
+            foreach (var s in _surfaces) s.RestoreZOrder();
+        }
+
         var autoPaused = _settings.PauseOnFullscreen && IsFullscreenAppActive();
         if (autoPaused != _autoPaused)
         {
             _autoPaused = autoPaused;
             UpdatePlayState();
         }
+    }
+
+    private bool SurfacesDirectlyBelowIcons()
+    {
+        if (_target.InsertAfter == IntPtr.Zero) return true; // older Windows: we live inside WorkerW
+        var ours = _surfaces.Select(s => s.Handle).ToHashSet();
+        var next = _target.InsertAfter;
+        for (var i = 0; i < ours.Count; i++)
+        {
+            next = GetWindow(next, GW_HWNDNEXT);
+            if (!ours.Contains(next)) return false;
+        }
+        return true;
     }
 
     private static bool IsFullscreenAppActive()

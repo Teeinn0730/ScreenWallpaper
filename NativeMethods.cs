@@ -26,6 +26,8 @@ internal static class NativeMethods
 
     public const uint MONITOR_DEFAULTTONEAREST = 2;
 
+    public const uint GW_HWNDNEXT = 2;
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
     {
@@ -84,6 +86,9 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool IsWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetWindow(IntPtr hwnd, uint command);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern bool SystemParametersInfo(uint action, uint param, StringBuilder? pvParam, uint winIni);
