@@ -11,7 +11,6 @@ internal sealed class Settings
     public string? FilePath { get; set; }
     public FitMode Mode { get; set; } = FitMode.Fill;
     public bool Muted { get; set; } = true;
-    public bool PauseOnFullscreen { get; set; } = true;
 
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenWallpaper");

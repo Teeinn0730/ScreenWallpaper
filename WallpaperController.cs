@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Threading;
@@ -21,15 +20,12 @@ internal sealed class WallpaperController : IDisposable
     private readonly List<WallpaperSurface> _surfaces = new();
     private VideoPlayer? _video; // one decoder shared by every monitor
     private readonly WinForms.NotifyIcon _tray;
-    private readonly DispatcherTimer _watchdog;
     private DesktopTarget _target;
     private string _screenLayout = "";
     private bool _userPaused;
-    private bool _autoPaused;
 
     private WinForms.ToolStripMenuItem _pauseItem = null!;
     private WinForms.ToolStripMenuItem _muteItem = null!;
-    private WinForms.ToolStripMenuItem _fullscreenItem = null!;
     private WinForms.ToolStripMenuItem _startupItem = null!;
     private readonly Dictionary<FitMode, WinForms.ToolStripMenuItem> _modeItems = new();
 
@@ -51,11 +47,10 @@ internal sealed class WallpaperController : IDisposable
         };
         _tray.DoubleClick += (_, _) => ChooseFile();
 
-        _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        _watchdog.Tick += (_, _) => Watch();
-        _watchdog.Start();
-
+        // No polling: work in other apps (e.g. game engines) must not be disturbed. The desktop is
+        // only re-checked when Windows reports a monitor change or a resume from sleep.
         SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
         if (_settings.FilePath is not null && File.Exists(_settings.FilePath))
             Apply();
@@ -106,14 +101,6 @@ internal sealed class WallpaperController : IDisposable
         menu.Items.Add(modeMenu);
 
         menu.Items.Add(new WinForms.ToolStripSeparator());
-
-        _fullscreenItem = new WinForms.ToolStripMenuItem("全螢幕程式執行時自動暫停", null, (_, _) =>
-        {
-            _settings.PauseOnFullscreen = !_settings.PauseOnFullscreen;
-            _settings.Save();
-            _fullscreenItem.Checked = _settings.PauseOnFullscreen;
-        }) { Checked = _settings.PauseOnFullscreen };
-        menu.Items.Add(_fullscreenItem);
 
         _startupItem = new WinForms.ToolStripMenuItem("開機時自動啟動", null, (_, _) =>
         {
@@ -226,7 +213,7 @@ internal sealed class WallpaperController : IDisposable
 
     private void UpdatePlayState()
     {
-        var paused = _userPaused || _autoPaused;
+        var paused = _userPaused;
         if (paused) _video?.Pause();
         else _video?.Play();
         foreach (var s in _surfaces)
@@ -237,31 +224,42 @@ internal sealed class WallpaperController : IDisposable
         _pauseItem.Text = _userPaused ? "繼續播放" : "暫停";
     }
 
-    private void Watch()
+    private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != PowerModes.Resume) return;
+        // Explorer recreates its static wallpaper window a few seconds after waking up, right
+        // below the icons, covering ours. Check a couple of times while the desktop settles.
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(() =>
+        {
+            foreach (var delay in new[] { 5, 20 })
+            {
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(delay) };
+                timer.Tick += (_, _) =>
+                {
+                    timer.Stop();
+                    RecoverDesktop();
+                };
+                timer.Start();
+            }
+        });
+    }
+
+    private void RecoverDesktop()
     {
         if (_surfaces.Count == 0) return;
 
         // Explorer restarted: our windows died with the old desktop, so rebuild them.
         if (!IsWindow(_target.Parent) || !IsWindow(_surfaces[0].Handle))
         {
-            Log.Write("Desktop window lost (Explorer restarted?), rebuilding");
+            Log.Write("Desktop window lost after resume, rebuilding");
             Apply();
             return;
         }
 
-        // Explorer recreates its static wallpaper window (e.g. after sleep or a wallpaper change)
-        // right below the icons, covering ours. Put our windows back on top of it.
         if (!SurfacesDirectlyBelowIcons())
         {
-            Log.Write("Desktop wallpaper layer moved above ours (after sleep or wallpaper change?), restoring order");
+            Log.Write("Desktop wallpaper layer moved above ours after resume, restoring order");
             foreach (var s in _surfaces) s.RestoreZOrder();
-        }
-
-        var autoPaused = _settings.PauseOnFullscreen && IsFullscreenAppActive();
-        if (autoPaused != _autoPaused)
-        {
-            _autoPaused = autoPaused;
-            UpdatePlayState();
         }
     }
 
@@ -276,20 +274,6 @@ internal sealed class WallpaperController : IDisposable
             if (!ours.Contains(next)) return false;
         }
         return true;
-    }
-
-    private static bool IsFullscreenAppActive()
-    {
-        var fg = GetForegroundWindow();
-        if (fg == IntPtr.Zero) return false;
-        var cls = NativeMethods.GetClassName(fg);
-        if (cls is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd") return false;
-
-        if (!GetWindowRect(fg, out var r)) return false;
-        var info = new MONITORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>() };
-        if (!GetMonitorInfo(MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST), ref info)) return false;
-        var m = info.rcMonitor;
-        return r.Left <= m.Left && r.Top <= m.Top && r.Right >= m.Right && r.Bottom >= m.Bottom;
     }
 
     private static string ScreenLayout() =>
@@ -358,7 +342,7 @@ internal sealed class WallpaperController : IDisposable
     public void Dispose()
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
-        _watchdog.Stop();
+        SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         Clear();
         _tray.Visible = false;
         _tray.Dispose();

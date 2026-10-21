@@ -24,8 +24,6 @@ internal static class NativeMethods
     public const uint SPI_GETDESKWALLPAPER = 0x0073;
     public const uint SPI_SETDESKWALLPAPER = 0x0014;
 
-    public const uint MONITOR_DEFAULTTONEAREST = 2;
-
     public const uint GW_HWNDNEXT = 2;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -34,15 +32,6 @@ internal static class NativeMethods
         public int Left, Top, Right, Bottom;
         public int Width => Right - Left;
         public int Height => Bottom - Top;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct MONITORINFO
-    {
-        public int cbSize;
-        public RECT rcMonitor;
-        public RECT rcWork;
-        public uint dwFlags;
     }
 
     public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
@@ -70,21 +59,6 @@ internal static class NativeMethods
     public static extern int MapWindowPoints(IntPtr from, IntPtr to, ref RECT points, int count);
 
     [DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    public static extern int GetClassName(IntPtr hwnd, StringBuilder buffer, int maxCount);
-
-    [DllImport("user32.dll")]
-    public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
-
-    [DllImport("user32.dll")]
-    public static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
-
-    [DllImport("user32.dll")]
     public static extern bool IsWindow(IntPtr hwnd);
 
     [DllImport("user32.dll")]
@@ -92,11 +66,4 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern bool SystemParametersInfo(uint action, uint param, StringBuilder? pvParam, uint winIni);
-
-    public static string GetClassName(IntPtr hwnd)
-    {
-        var sb = new StringBuilder(256);
-        GetClassName(hwnd, sb, sb.Capacity);
-        return sb.ToString();
-    }
 }
